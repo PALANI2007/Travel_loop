@@ -1,0 +1,12 @@
+{
+  "name": "travel",
+  "version": "1.0.0",
+  "description": "Traveloop - Premium Travel SaaS",
+  "scripts": {
+    "dev": "cd Traveloop/client && npm run dev",
+    "install:all": "npm install && cd Traveloop/client && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
