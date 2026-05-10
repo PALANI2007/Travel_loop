@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-hot-toast';
-import { Mail, Lock, Eye, EyeOff, Plane, ArrowRight, Globe, Compass, MapPin } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Mail, Lock, Eye, EyeOff, Plane, ArrowRight, Globe, MapPin } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const Login = () => {
   const [email, setEmail] = useState('');

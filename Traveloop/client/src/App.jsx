@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './hooks/useAuth';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
@@ -13,6 +14,7 @@ import BudgetTracker from './pages/BudgetTracker';
 import PackingChecklist from './pages/PackingChecklist';
 import UserProfile from './pages/UserProfile';
 import AdminDashboard from './pages/AdminDashboard';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -49,47 +51,49 @@ function App() {
             },
           }}
         />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/verify-email" element={<OTPVerification />} />
-          
-          {/* Explicit /protected route as requested by user */}
-          <Route path="/protected" element={<Navigate to="/dashboard" />} />
-          
-          <Route path="/" element={
-            <ProtectedRoute>
-              <MainLayout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<Navigate to="/dashboard" />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="trips" element={<MyTrips />} />
-            <Route path="trips/new" element={<CreateTrip />} />
-            <Route path="trips/:id" element={<TripDetail />} />
-            <Route path="budget" element={<BudgetTracker />} />
-            <Route path="checklist" element={<PackingChecklist />} />
-            <Route path="settings" element={<UserProfile />} />
-            <Route path="admin" element={<AdminDashboard />} />
-          </Route>
-
-          {/* Catch-all 404 handler */}
-          <Route path="*" element={
-            <div className="min-h-screen flex flex-col items-center justify-center bg-[#020617] text-white p-4">
-              <h1 className="text-9xl font-bold text-primary-500/20 absolute select-none">404</h1>
-              <div className="relative z-10 text-center">
-                <h2 className="text-4xl font-bold mb-4">Lost in <span className="text-gradient">Space?</span></h2>
-                <p className="text-slate-400 mb-8 max-w-md">The destination you're looking for doesn't exist. Let's get you back on track.</p>
-                <button 
-                  onClick={() => window.location.href = '/'}
-                  className="btn-primary"
-                >
-                  Return to Base
-                </button>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-email" element={<OTPVerification />} />
+            
+            {/* Explicit /protected route as requested by user */}
+            <Route path="/protected" element={<Navigate to="/dashboard" />} />
+            
+            <Route path="/" element={
+              <ProtectedRoute>
+                <MainLayout />
+              </ProtectedRoute>
+            }>
+              <Route index element={<Navigate to="/dashboard" />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="trips" element={<MyTrips />} />
+              <Route path="trips/new" element={<CreateTrip />} />
+              <Route path="trips/:id" element={<TripDetail />} />
+              <Route path="budget" element={<BudgetTracker />} />
+              <Route path="checklist" element={<PackingChecklist />} />
+              <Route path="settings" element={<UserProfile />} />
+              <Route path="admin" element={<AdminDashboard />} />
+            </Route>
+  
+            {/* Catch-all 404 handler */}
+            <Route path="*" element={
+              <div className="min-h-screen flex flex-col items-center justify-center bg-[#020617] text-white p-4">
+                <h1 className="text-9xl font-bold text-primary-500/20 absolute select-none">404</h1>
+                <div className="relative z-10 text-center">
+                  <h2 className="text-4xl font-bold mb-4">Lost in <span className="text-gradient">Space?</span></h2>
+                  <p className="text-slate-400 mb-8 max-w-md">The destination you're looking for doesn't exist. Let's get you back on track.</p>
+                  <button 
+                    onClick={() => window.location.href = '/'}
+                    className="btn-primary"
+                  >
+                    Return to Base
+                  </button>
+                </div>
               </div>
-            </div>
-          } />
-        </Routes>
+            } />
+          </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );

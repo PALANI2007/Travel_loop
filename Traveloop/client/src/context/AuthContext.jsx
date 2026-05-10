@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
@@ -7,9 +7,8 @@ import {
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from '../utils/firebase';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
-
-const AuthContext = createContext();
+import { doc, onSnapshot } from 'firebase/firestore';
+import { AuthContext } from './AuthContextCore';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -21,17 +20,16 @@ export const AuthProvider = ({ children }) => {
 
     if (!auth) {
       console.error("Firebase Auth not initialized correctly. Check your configuration.");
-      setLoading(false);
-      return;
+      // Use setTimeout to avoid cascading renders warning in effect
+      const timer = setTimeout(() => setLoading(false), 0);
+      return () => clearTimeout(timer);
     }
 
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      console.log("Auth State Changed:", currentUser ? currentUser.uid : "No user");
       setUser(currentUser);
       
       if (currentUser) {
         try {
-          // Use onSnapshot for real-time updates of user profile
           unsubscribeFirestore = onSnapshot(doc(db, 'users', currentUser.uid), (snapshot) => {
             if (snapshot.exists()) {
               setUserData(snapshot.data());
@@ -39,7 +37,7 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
           }, (error) => {
             console.error("Firestore sync error:", error);
-            setLoading(false); // Still stop loading if firestore fails
+            setLoading(false);
           });
         } catch (error) {
           console.error("Firestore setup error:", error);
@@ -71,5 +69,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

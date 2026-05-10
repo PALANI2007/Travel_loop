@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import Navbar from '../components/Navbar';
+import Chatbot from '../components/Chatbot';
 import { motion } from 'framer-motion';
 
 const MainLayout = () => {
@@ -26,6 +27,7 @@ const MainLayout = () => {
           </motion.div>
         </main>
       </div>
+      <Chatbot />
     </div>
   );
 };

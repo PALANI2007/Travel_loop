@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { toast } from 'react-hot-toast';
-import { UserPlus, Mail, Lock, User, Plane, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, User, Plane, ArrowRight, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { db } from '../utils/firebase';
 import { doc, setDoc } from 'firebase/firestore';
@@ -71,7 +71,7 @@ const Signup = () => {
       navigate('/dashboard');
     } catch (error) {
       console.error('FULL SIGNUP ERROR:', error);
-      let message = 'Failed to create account.';
+      let message;
       
       if (error.code === 'auth/email-already-in-use') {
         message = 'This email is already registered.';

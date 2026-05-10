@@ -10,56 +10,124 @@ import {
   ChevronRight, 
   Clock, 
   Star,
-  ArrowUpRight
+  ArrowUpRight,
+  Sparkles
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { db } from '../utils/firebase';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
+import { useAuth } from '../hooks/useAuth';
+import { safeCurrency, safeNumber, safeArray, safeString, safeParseJSON } from '../utils/safeHelpers';
 
 const Dashboard = () => {
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [trips, setTrips] = useState([]);
+  const [, setExpenses] = useState(() => {
+    try {
+      return safeParseJSON(localStorage.getItem('traveloop_expenses'), []);
+    } catch {
+      return [];
+    }
+  });
+  const [stats, setStats] = useState([
+    { label: 'Active Trips', value: '0', icon: Calendar, color: 'text-primary-400', bg: 'bg-primary-500/10' },
+    { label: 'Destinations', value: '0', icon: MapPin, color: 'text-accent-400', bg: 'bg-accent-500/10' },
+    { label: 'Total Spent', value: '₹0', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+    { label: 'Travel Distance', value: '0K', icon: Plane, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  ]);
 
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => setLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    if (!user) return;
 
-  if (loading) {
-    return (
-      <div className="max-w-7xl mx-auto space-y-10 pb-20 animate-pulse">
-        <div className="h-80 rounded-[2.5rem] skeleton"></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-32 rounded-3xl skeleton"></div>)}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          <div className="lg:col-span-2 h-96 rounded-[2rem] skeleton"></div>
-          <div className="h-96 rounded-[2rem] skeleton"></div>
-        </div>
-      </div>
+    const qTrips = query(
+      collection(db, 'trips'),
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc')
     );
-  }
 
-  const stats = [
-    { label: 'Active Trips', value: '3', icon: Calendar, color: 'text-primary-400', bg: 'bg-primary-500/10' },
-    { label: 'Destinations', value: '12', icon: MapPin, color: 'text-accent-400', bg: 'bg-accent-500/10' },
-    { label: 'Total Spent', value: '₹3,45,000', icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-    { label: 'Travel Miles', value: '24K', icon: Plane, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-  ];
+    const unsubscribeTrips = onSnapshot(qTrips, (snapshot) => {
+      const tripData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setTrips(tripData);
+      
+      const activeCount = safeArray(tripData).filter(t => t?.status === 'upcoming' || t?.status === 'ongoing').length;
+      const destCount = [...new Set(safeArray(tripData).map(t => t?.destination).filter(Boolean))].length;
+      const km = destCount * 1240;
+      const kmFormatted = km >= 1000 ? (km / 1000).toFixed(1) + 'K' : km.toString();
+      
+      setStats(prev => [
+        { ...prev[0], value: safeNumber(activeCount).toString() },
+        { ...prev[1], value: safeNumber(destCount).toString() },
+        { ...prev[2], value: prev[2].value }, 
+        { ...prev[3], value: `${kmFormatted} KM` }
+      ]);
+    });
 
-  const recentTrips = [
-    { id: 1, name: 'Summer in Bali', date: 'June 12 - June 24', image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80', status: 'Upcoming', budget: '₹1,50,000' },
-    { id: 2, name: 'Tokyo Adventure', date: 'Sept 05 - Sept 15', image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=800&q=80', status: 'Completed', budget: '₹2,10,000' },
-  ];
+    const qExpenses = query(
+      collection(db, 'expenses'),
+      where('userId', '==', user.uid)
+    );
 
-  const chartData = [
-    { name: 'Jan', spent: 400 },
-    { name: 'Feb', spent: 300 },
-    { name: 'Mar', spent: 200 },
-    { name: 'Apr', spent: 278 },
-    { name: 'May', spent: 189 },
-    { name: 'Jun', spent: 239 },
-    { name: 'Jul', spent: 349 },
-  ];
+    const unsubscribeExpenses = onSnapshot(qExpenses, (snapshot) => {
+      const expenseData = safeArray(snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })));
+      setExpenses(expenseData);
+      try {
+        localStorage.setItem('traveloop_expenses', JSON.stringify(expenseData));
+      } catch (err) {
+        console.error("Failed to save expenses to storage:", err);
+      }
+      
+      const totalSpentAmount = expenseData.reduce((acc, curr) => acc + safeNumber(curr?.amount), 0);
+      setStats(prev => {
+        const newStats = [...prev];
+        newStats[2] = { ...newStats[2], value: safeCurrency(totalSpentAmount) };
+        return newStats;
+      });
+    });
+
+    return () => {
+      unsubscribeTrips();
+      unsubscribeExpenses();
+    };
+  }, [user]);
+
+  // Aggregate monthly spending for chart
+  const getChartData = () => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonthIndex = new Date().getMonth();
+    const last6Months = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const idx = (currentMonthIndex - i + 12) % 12;
+      last6Months.push(months[idx]);
+    }
+
+    return safeArray(last6Months).map(month => {
+      const monthlyTotal = safeArray(trips).reduce((acc, trip) => {
+        const startStr = safeString(trip?.startDate);
+        if (!startStr) return acc;
+        
+        try {
+          const tripDate = new Date(startStr);
+          if (isNaN(tripDate.getTime())) return acc;
+          const tripMonth = tripDate.toLocaleString('en-US', { month: 'short' });
+          return tripMonth === month ? acc + safeNumber(trip?.totalBudget) : acc;
+        } catch {
+          return acc;
+        }
+      }, 0);
+      return { name: month, spent: monthlyTotal };
+    });
+  };
+
+  const chartData = getChartData();
 
   const popularDestinations = [
     { name: 'Santorini, Greece', rating: 4.9, image: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=400&q=80' },
@@ -169,45 +237,52 @@ const Dashboard = () => {
               </Link>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {recentTrips.map((trip) => (
-                <motion.div 
-                  key={trip.id} 
-                  whileHover={{ y: -8 }}
-                  className="group relative h-80 rounded-[2rem] overflow-hidden shadow-xl"
-                >
-                  <img 
-                    src={trip.image} 
-                    alt={trip.name} 
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
-                  
-                  <div className="absolute top-4 right-4">
-                    <span className="px-4 py-1.5 glass-light backdrop-blur-xl rounded-full text-xs font-bold text-white">
-                      {trip.status}
-                    </span>
-                  </div>
-
-                  <div className="absolute bottom-6 left-6 right-6">
-                    <h4 className="text-2xl font-bold text-white mb-2">{trip.name}</h4>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <p className="text-slate-300 text-sm flex items-center gap-1">
-                          <Calendar size={14} className="text-primary-500" />
-                          {trip.date}
-                        </p>
-                        <p className="text-slate-300 text-sm flex items-center gap-1">
-                          <DollarSign size={14} className="text-emerald-500" />
-                          {trip.budget}
-                        </p>
-                      </div>
-                      <Link to={`/trips/${trip.id}`} className="w-10 h-10 rounded-full glass flex items-center justify-center text-white hover:bg-primary-500 transition-colors">
-                        <ArrowUpRight size={20} />
-                      </Link>
+              {safeArray(trips).length > 0 ? (
+                safeArray(trips).slice(0, 2).map((trip) => (
+                  <motion.div 
+                    key={trip?.id} 
+                    whileHover={{ y: -8 }}
+                    className="group relative h-80 rounded-[2rem] overflow-hidden shadow-xl"
+                  >
+                    <img 
+                      src={trip?.coverImage || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?auto=format&fit=crop&w=800&q=80'} 
+                      alt={trip?.name || 'Trip'} 
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-transparent opacity-80 group-hover:opacity-90 transition-opacity"></div>
+                    
+                    <div className="absolute top-4 right-4">
+                      <span className="px-4 py-1.5 glass-light backdrop-blur-xl rounded-full text-[10px] font-black uppercase tracking-widest text-white">
+                        {trip?.status || 'Upcoming'}
+                      </span>
                     </div>
-                  </div>
-                </motion.div>
-              ))}
+ 
+                    <div className="absolute bottom-6 left-6 right-6">
+                      <h4 className="text-2xl font-black text-white mb-2 tracking-tight">{trip?.name || 'Untitled Trip'}</h4>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                            <Calendar size={12} className="text-primary-500" />
+                            {trip?.startDate ? new Date(trip.startDate).toLocaleDateString('en-IN', {month: 'short', day: 'numeric'}) : 'Planning...'}
+                          </p>
+                          <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                            <DollarSign size={12} className="text-emerald-500" />
+                            {safeString(trip?.budget, 'Moderate')}
+                          </p>
+                        </div>
+                        <Link to={`/trips/${trip?.id}`} className="w-10 h-10 rounded-full glass flex items-center justify-center text-white hover:bg-primary-500 transition-colors">
+                          <ArrowUpRight size={20} />
+                        </Link>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="md:col-span-2 glass p-12 text-center border-white/5">
+                  <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">No Recent Adventures</p>
+                  <Link to="/trips/new" className="text-primary-400 font-black mt-4 inline-block hover:underline">Start your first journey →</Link>
+                </div>
+              )}
             </div>
           </section>
 
@@ -248,8 +323,8 @@ const Dashboard = () => {
                       if (active && payload && payload.length) {
                         return (
                           <div className="glass p-4 border-white/10 shadow-2xl">
-                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">{label}</p>
-                            <p className="text-lg font-black text-white">₹{payload[0].value.toLocaleString()}</p>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">{safeString(label)}</p>
+                            <p className="text-lg font-black text-white">{safeCurrency(payload[0]?.value)}</p>
                           </div>
                         );
                       }
@@ -290,8 +365,17 @@ const Dashboard = () => {
                   <div>
                     <h4 className="font-bold text-white group-hover:text-primary-400 transition-colors">{dest.name}</h4>
                     <p className="text-sm text-slate-400 mb-2">Trending Choice</p>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-slate-300 bg-white/5 px-2 py-0.5 rounded-md">{dest.rating} Rating</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/trips/new', { state: { destination: dest.name } });
+                        }}
+                        className="text-[10px] font-black uppercase tracking-widest text-primary-400 hover:text-primary-300 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all"
+                      >
+                        Generate <Sparkles size={10} />
+                      </button>
                     </div>
                   </div>
                 </motion.div>

@@ -6,16 +6,14 @@ import {
   Wallet, 
   CheckSquare, 
   User, 
-  Settings, 
   Shield, 
   LogOut,
   Plane
 } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { motion } from 'framer-motion';
+import { useAuth } from '../hooks/useAuth';
 
 const Sidebar = () => {
-  const { logout } = useAuth();
+  const { logout, userData } = useAuth();
 
   const links = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -59,15 +57,17 @@ const Sidebar = () => {
           <User size={20} className="group-hover:scale-110 transition-transform" />
           <span>Profile</span>
         </NavLink>
-        <NavLink
-          to="/admin"
-          className={({ isActive }) => 
-            `nav-link group ${isActive ? 'bg-primary-500/10 text-primary-400 border border-primary-500/20' : ''}`
-          }
-        >
-          <Shield size={20} className="group-hover:scale-110 transition-transform" />
-          <span>Admin</span>
-        </NavLink>
+        {userData?.role === 'admin' && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) => 
+              `nav-link group ${isActive ? 'bg-primary-500/10 text-primary-400 border border-primary-500/20' : ''}`
+            }
+          >
+            <Shield size={20} className="group-hover:scale-110 transition-transform" />
+            <span>Admin</span>
+          </NavLink>
+        )}
       </nav>
 
       <div className="mt-auto pt-6 border-t border-white/5">

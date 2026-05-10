@@ -4,6 +4,8 @@
   "description": "Traveloop - Premium Travel SaaS",
   "scripts": {
     "dev": "cd Traveloop/client && npm run dev",
+    "build": "cd Traveloop/client && npm run build",
+    "lint": "cd Traveloop/client && npm run lint",
     "install:all": "npm install && cd Traveloop/client && npm install"
   },
   "devDependencies": {
